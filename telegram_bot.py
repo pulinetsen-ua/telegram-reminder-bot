@@ -77,18 +77,32 @@ def get_todays_tasks(date_str):
 
 # ─── Ежедневные напоминания ───────────────────────────────────────────────────
 
+def cleanup_past_tasks():
+    """Удаляет из таблицы строки с уже прошедшими датами"""
+    try:
+        r = requests.get(SHEETS_URL, params={"action": "cleanup"}, timeout=10)
+        data = r.json()
+        deleted = data.get("deleted", 0)
+        if deleted:
+            print(f"  🗑 Удалено устаревших задач: {deleted}")
+    except Exception as e:
+        print(f"Ошибка очистки таблицы: {e}")
+
+
 def send_reminders():
     today = datetime.now().strftime("%d.%m.%y")
     print(f"[{datetime.now().strftime('%H:%M')}] Проверяю задачи на {today}...")
     tasks = get_todays_tasks(today)
     if not tasks:
         print("  Задач на сегодня нет.")
-        return
-    for task in tasks:
-        chat_id = task.get("id")
-        desc    = task.get("description", "")
-        send(chat_id, f"🔔 Напоминание на сегодня:\n📝 {desc}")
-        print(f"  → Отправлено {chat_id}: {desc}")
+    else:
+        for task in tasks:
+            chat_id = task.get("id")
+            desc    = task.get("description", "")
+            send(chat_id, f"🔔 Напоминание на сегодня:\n📝 {desc}")
+            print(f"  → Отправлено {chat_id}: {desc}")
+    # После отправки удаляем устаревшие строки
+    cleanup_past_tasks()
 
 
 def reminder_worker():
