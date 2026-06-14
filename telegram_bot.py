@@ -10,14 +10,12 @@ SHEETS_URL = "https://script.google.com/macros/s/AKfycbyFYpMeGjbE3ufAlz7n3_WfIWB
 
 REMINDER_HOUR   = 9
 REMINDER_MINUTE = 15
-PORT = 10000  # Render использует этот порт
+PORT = 10000
 # ─────────────────────────────────────────────────────────────────────────────
 
 API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 user_states = {}
 
-
-# ─── HTTP-сервер (нужен для Render) ──────────────────────────────────────────
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -25,14 +23,12 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Bot is running")
     def log_message(self, format, *args):
-        pass  # отключаем лишние логи
+        pass
 
 def run_http_server():
     server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
     server.serve_forever()
 
-
-# ─── Telegram ─────────────────────────────────────────────────────────────────
 
 def get_updates(offset):
     try:
@@ -49,8 +45,6 @@ def send(chat_id, text):
         print(f"Ошибка отправки: {e}")
 
 
-# ─── Google Sheets ────────────────────────────────────────────────────────────
-
 def save_to_sheets(user_id, date, description):
     try:
         r = requests.post(SHEETS_URL,
@@ -64,9 +58,7 @@ def save_to_sheets(user_id, date, description):
 
 def get_todays_tasks(date_str):
     try:
-        r = requests.get(SHEETS_URL,
-                         params={"action": "get_today", "date": date_str},
-                         timeout=10)
+        r = requests.get(SHEETS_URL, params={"action": "get_today", "date": date_str}, timeout=10)
         data = r.json()
         if data.get("status") == "ok":
             return data.get("tasks", [])
@@ -75,16 +67,13 @@ def get_todays_tasks(date_str):
     return []
 
 
-# ─── Ежедневные напоминания ───────────────────────────────────────────────────
-
 def cleanup_past_tasks():
-    """Удаляет из таблицы строки с уже прошедшими датами"""
     try:
         r = requests.get(SHEETS_URL, params={"action": "cleanup"}, timeout=10)
         data = r.json()
         deleted = data.get("deleted", 0)
         if deleted:
-            print(f"  🗑 Удалено устаревших задач: {deleted}")
+            print(f"  Удалено устаревших задач: {deleted}")
     except Exception as e:
         print(f"Ошибка очистки таблицы: {e}")
 
@@ -101,7 +90,6 @@ def send_reminders():
             desc    = task.get("description", "")
             send(chat_id, f"🔔 Напоминание на сегодня:\n📝 {desc}")
             print(f"  → Отправлено {chat_id}: {desc}")
-    # После отправки удаляем устаревшие строки
     cleanup_past_tasks()
 
 
@@ -116,8 +104,6 @@ def reminder_worker():
                 sent_on = today
         time.sleep(30)
 
-
-# ─── Обработка команд бота ────────────────────────────────────────────────────
 
 def handle(update):
     msg = update.get("message")
@@ -164,16 +150,9 @@ def handle(update):
     send(chat_id, "Привет! Используй /add чтобы добавить напоминание.")
 
 
-# ─── Запуск ───────────────────────────────────────────────────────────────────
-
 def main():
     print(f"🤖 Бот запущен. Напоминания в {REMINDER_HOUR:02d}:{REMINDER_MINUTE:02d}.")
-
-    # HTTP-сервер для Render
     threading.Thread(target=run_http_server, daemon=True).start()
-    print(f"🌐 HTTP-сервер запущен на порту {PORT}")
-
-    # Поток напоминаний
     threading.Thread(target=reminder_worker, daemon=True).start()
 
     offset = 0
