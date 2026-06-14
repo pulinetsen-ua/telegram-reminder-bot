@@ -2,7 +2,10 @@ import requests
 import time
 import threading
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+KYIV = ZoneInfo("Europe/Kyiv")
 
 # ─── Настройки ───────────────────────────────────────────────────────────────
 BOT_TOKEN = "8952145944:AAGujDqRN8BcshBgjH8Ll_05CpmVaKczC4w"
@@ -79,8 +82,8 @@ def cleanup_past_tasks():
 
 
 def send_reminders():
-    today = datetime.now().strftime("%d.%m.%y")
-    print(f"[{datetime.now().strftime('%H:%M')}] Проверяю задачи на {today}...")
+    today = datetime.now(KYIV).strftime("%d.%m.%y")
+    print(f"Проверяю задачи на {today}...")
     tasks = get_todays_tasks(today)
     if not tasks:
         print("  Задач на сегодня нет.")
@@ -96,7 +99,7 @@ def send_reminders():
 def reminder_worker():
     sent_on = None
     while True:
-        now = datetime.now()
+        now = datetime.now(KYIV)
         if now.hour == REMINDER_HOUR and now.minute == REMINDER_MINUTE:
             today = now.strftime("%Y-%m-%d")
             if sent_on != today:
@@ -151,7 +154,7 @@ def handle(update):
 
 
 def main():
-    print(f"🤖 Бот запущен. Напоминания в {REMINDER_HOUR:02d}:{REMINDER_MINUTE:02d}.")
+    print(f"🤖 Бот запущен. Напоминания в {REMINDER_HOUR:02d}:{REMINDER_MINUTE:02d} по Киеву.")
     threading.Thread(target=run_http_server, daemon=True).start()
     threading.Thread(target=reminder_worker, daemon=True).start()
 
