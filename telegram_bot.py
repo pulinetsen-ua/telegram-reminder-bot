@@ -2,18 +2,34 @@ import requests
 import time
 import threading
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ─── Настройки ───────────────────────────────────────────────────────────────
 BOT_TOKEN = "8952145944:AAGujDqRN8BcshBgjH8Ll_05CpmVaKczC4w"
 SHEETS_URL = "https://script.google.com/macros/s/AKfycbyFYpMeGjbE3ufAlz7n3_WfIWBW-3z-f18RTiJohfHdAtmPoNm_PQ3wwHFtN4sFMUWG/exec"
 
-# Время отправки напоминаний (по местному времени компьютера)
 REMINDER_HOUR   = 9
 REMINDER_MINUTE = 15
+PORT = 10000  # Render использует этот порт
 # ─────────────────────────────────────────────────────────────────────────────
 
 API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 user_states = {}
+
+
+# ─── HTTP-сервер (нужен для Render) ──────────────────────────────────────────
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running")
+    def log_message(self, format, *args):
+        pass  # отключаем лишние логи
+
+def run_http_server():
+    server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
+    server.serve_forever()
 
 
 # ─── Telegram ─────────────────────────────────────────────────────────────────
@@ -47,7 +63,6 @@ def save_to_sheets(user_id, date, description):
 
 
 def get_todays_tasks(date_str):
-    """Читает задачи из таблицы по дате формата ДД.ММ.ГГ"""
     try:
         r = requests.get(SHEETS_URL,
                          params={"action": "get_today", "date": date_str},
@@ -72,13 +87,11 @@ def send_reminders():
     for task in tasks:
         chat_id = task.get("id")
         desc    = task.get("description", "")
-        msg = f"🔔 Напоминание на сегодня:\n📝 {desc}"
-        send(chat_id, msg)
-        print(f"  → Отправлено пользователю {chat_id}: {desc}")
+        send(chat_id, f"🔔 Напоминание на сегодня:\n📝 {desc}")
+        print(f"  → Отправлено {chat_id}: {desc}")
 
 
 def reminder_worker():
-    """Фоновый поток: каждые 30 сек проверяет время, в 9:15 шлёт напоминания"""
     sent_on = None
     while True:
         now = datetime.now()
@@ -127,7 +140,6 @@ def handle(update):
             date = user_states[chat_id]["date"]
             desc = text
             del user_states[chat_id]
-
             ok = save_to_sheets(chat_id, date, desc)
             if ok:
                 send(chat_id, f"✅ Напоминание добавлено!\n📅 {date}\n📝 {desc}")
@@ -141,11 +153,14 @@ def handle(update):
 # ─── Запуск ───────────────────────────────────────────────────────────────────
 
 def main():
-    print(f"🤖 Бот запущен. Напоминания будут отправляться в {REMINDER_HOUR:02d}:{REMINDER_MINUTE:02d}.")
-    print("Для остановки нажми Ctrl+C\n")
+    print(f"🤖 Бот запущен. Напоминания в {REMINDER_HOUR:02d}:{REMINDER_MINUTE:02d}.")
 
-    t = threading.Thread(target=reminder_worker, daemon=True)
-    t.start()
+    # HTTP-сервер для Render
+    threading.Thread(target=run_http_server, daemon=True).start()
+    print(f"🌐 HTTP-сервер запущен на порту {PORT}")
+
+    # Поток напоминаний
+    threading.Thread(target=reminder_worker, daemon=True).start()
 
     offset = 0
     while True:
