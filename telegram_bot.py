@@ -61,10 +61,15 @@ def save_to_sheets(user_id, date, description):
 
 def get_todays_tasks(date_str):
     try:
-        r = requests.get(SHEETS_URL, params={"action": "get_today", "date": date_str}, timeout=10)
+        url = f"{SHEETS_URL}?action=get_today&date={date_str}"
+        r = requests.get(url, timeout=15, allow_redirects=True)
+        print(f"  Статус: {r.status_code}, URL: {r.url[:80]}")
+        print(f"  Ответ: {r.text[:300]}")
         data = r.json()
         if data.get("status") == "ok":
             return data.get("tasks", [])
+        else:
+            print(f"  Ошибка Apps Script: {data}")
     except Exception as e:
         print(f"Ошибка чтения таблицы: {e}")
     return []
