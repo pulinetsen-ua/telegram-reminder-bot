@@ -100,11 +100,12 @@ def reminder_worker():
     sent_on = None
     while True:
         now = datetime.now(KYIV)
-        if now.hour == REMINDER_HOUR and now.minute == REMINDER_MINUTE:
-            today = now.strftime("%Y-%m-%d")
-            if sent_on != today:
-                send_reminders()
-                sent_on = today
+        today = now.strftime("%Y-%m-%d")
+        past_reminder_time = (now.hour > REMINDER_HOUR or
+                              (now.hour == REMINDER_HOUR and now.minute >= REMINDER_MINUTE))
+        if past_reminder_time and sent_on != today:
+            send_reminders()
+            sent_on = today
         time.sleep(30)
 
 
